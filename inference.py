@@ -1,79 +1,87 @@
 import litert_lm
 from pathlib import Path
-import sys
+import os
+import time
+from typing import Generator, List, Dict, Any
 
-MODELS_BASE_DIR = Path("models")
+class InferenceManager:
+    def __init__(self, model_path: str):
+        self.model_path = model_path
+        self.engine = None
+        
+        # Log seviyesini ayarla
+        litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
+        
+    def load(self):
+        if self.engine is None:
+            print(f"Loading LiteRT-LM engine from: {self.model_path}")
+            # .litertlm dosyasıysa direkt yolu ver, dizinse dizin yolunu ver
+            self.engine = litert_lm.Engine(self.model_path)
+        return self
 
-def list_models():
-    if not MODELS_BASE_DIR.exists():
-        print("No 'models' directory found. Please run download_model.py first.")
-        return None
+    def __enter__(self):
+        return self.load()
 
-    models = []
-    for subdir in MODELS_BASE_DIR.iterdir():
-        if subdir.is_dir():
-            litertlm_files = list(subdir.glob("*.litertlm"))
-            tflite_files = list(subdir.glob("*.tflite"))
-            model_files = litertlm_files or tflite_files
-            if model_files:
-                primary_file = model_files[0]
-                models.append((subdir.name, primary_file, subdir))
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.engine:
+            self.engine.__exit__(exc_type, exc_val, exc_tb)
+            self.engine = None
 
-    if not models:
-        print("No models found. Please run download_model.py first.")
-        return None
+    def create_conversation(self):
+        if not self.engine:
+            self.load()
+        return self.engine.create_conversation()
 
-    print("\n=== Available models ===")
-    for i, (name, path, _) in enumerate(models, 1):
-        size_gb = path.stat().st_size / (1024 ** 3)
-        print(f"[{i}] {name} ({path.name}) - {size_gb:.2f} GB")
-    return models
-
-def initialize_engine():
-    available = list_models()
-    if not available:
-        sys.exit(1)
-
-    while True:
-        try:
-            choice = input("\nEnter number of the model you want to use (or 'q' to quit): ").strip()
-            if choice.lower() == 'q':
-                sys.exit(0)
-            idx = int(choice) - 1
-            if 0 <= idx < len(available):
-                model_name, model_path, model_dir = available[idx]
-                break
-            else:
-                print("Invalid number!")
-        except ValueError:
-            print("Invalid input. Please enter a number or 'q'.")
-
-    litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
-
-    engine_path = str(model_path) if model_path.suffix == ".litertlm" else str(model_dir)
-    print(f"LiteRT-LM engine initialized with: {model_name} ({engine_path})")
-    return litert_lm.Engine(engine_path)
-
-def main_demo():
-    """Basic terminal demo with correct streaming"""
-    with initialize_engine() as engine:
-        with engine.create_conversation() as conversation:
-            print("Type 'exit' or 'q' to quit.\n")
+    def generate_stream(self, messages: List[Dict[str, str]]) -> Generator[Dict[str, Any], None, None]:
+        """
+        OpenAI formatındaki mesaj listesini alır ve streaming yanıt döner.
+        Stateless çalışmak için her seferinde yeni bir conversation açar ve geçmişi besler.
+        """
+        with self.create_conversation() as conversation:
+            # Geçmiş mesajları besle (son mesaj hariç)
+            for msg in messages[:-1]:
+                content = msg.content if hasattr(msg, "content") else msg.get("content", "")
+                role = msg.role if hasattr(msg, "role") else msg.get("role", "user")
+                # LiteRT-LM şu an ağırlıklı olarak user prompt'u bekliyor.
+                # Sistem mesajı veya asistan mesajları için uygun formatlama gerekebilir.
+                # Şimdilik direkt gönderiyoruz.
+                for _ in conversation.send_message_async(content):
+                    pass # Yanıtı tüket ama kullanma
             
-            while True:
-                user_input = input("👤 You: ")
-                if user_input.lower() in ["exit", "q", "çık"]:
-                    break
-                
-                print("🤖 AI: ", end="", flush=True)
-                
-                # DOĞRU STREAMING KODU (resmi LiteRT-LM API)
-                for chunk in conversation.send_message_async(user_input):
-                    for item in chunk.get("content", []):
-                        if item.get("type") == "text":
-                            print(item.get("text", ""), end="", flush=True)
-                
-                print("\n")  # Cevap bittiğinde yeni satır
+            # Son mesajı gönder ve yanıtı stream et
+            last_message = messages[-1].content if messages else ""
+            for chunk in conversation.send_message_async(last_message):
+                yield chunk
 
-if __name__ == "__main__":
-    main_demo()
+    def generate(self, messages: List[Dict[str, str]]) -> str:
+        """Non-streaming yanıt döner."""
+        full_text = ""
+        for chunk in self.generate_stream(messages):
+            for item in chunk.get("content", []):
+                if item.get("type") == "text":
+                    full_text += item.get("text", "")
+        return full_text
+
+def get_model_path(models_dir: str = "models", model_repo: str = None, model_file: str = None):
+    """
+    Belirtilen veya varsayılan model yolunu döner.
+    """
+    if not model_repo:
+        from download_model import DEFAULT_MODEL
+        model_repo = DEFAULT_MODEL
+        
+    folder_name = model_repo.replace("/", "--")
+    model_dir = Path(models_dir) / folder_name
+    
+    if model_file:
+        full_path = model_dir / model_file
+        if full_path.exists():
+            return str(full_path)
+    
+    # Dosya belirtilmemişse veya yoksa dizinde ara
+    if model_dir.exists():
+        files = list(model_dir.glob("*.litertlm")) or list(model_dir.glob("*.tflite"))
+        if files:
+            return str(files[0])
+            
+    return None

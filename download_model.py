@@ -10,7 +10,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
     huggingface_hub.login(token=HF_TOKEN)
 
-DEFAULT_MODEL = "litert-community/SmolLM-135M-Instruct"
+DEFAULT_MODEL = "litert-community/gemma-4-E2B-it-litert-lm"
 MODELS_BASE_DIR = Path("models")
 
 def repo_to_folder_name(repo_id: str) -> str:
@@ -89,7 +89,7 @@ def main():
     if success:
         folder_name = repo_to_folder_name(repo_id)
         print(f"\nModel ready in: models/{folder_name}")
-        print(f"Run: python inference.py")
+        print(f"Run: python main.py")
     else:
         sys.exit(1)
 
