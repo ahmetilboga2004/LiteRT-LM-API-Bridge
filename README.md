@@ -1,6 +1,6 @@
 # LiteBridge: Lightweight OpenAI-Compatible API for LiteRT
 
-LiteBridge, Google'ın **LiteRT** (eski adıyla TFLite) modellerini OpenAI uyumlu bir API üzerinden sunan, yüksek performanslı ve "hafif" bir köprü (gateway) uygulamasıdır. 
+LiteBridge, Google'ın **LiteRT-LM** modellerini OpenAI uyumlu bir API üzerinden sunan, yüksek performanslı ve "hafif" bir köprü (gateway) uygulamasıdır. 
 
 Ollama'ya benzer bir amaç güder fakat çok daha düşük kaynak tüketimi ve LiteRT'nin kenar cihazlar için optimize edilmiş gücünü kullanır.
 
