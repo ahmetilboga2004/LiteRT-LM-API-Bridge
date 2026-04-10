@@ -2,6 +2,8 @@ import os
 import time
 import json
 import uuid
+import logging
+from logging.handlers import RotatingFileHandler
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -12,6 +14,13 @@ from inference import InferenceManager, get_model_path
 
 # Load environment variables
 load_dotenv()
+
+# Setup Logging to file
+logger = logging.getLogger("api_requests")
+logger.setLevel(logging.INFO)
+file_handler = RotatingFileHandler("api_requests.log", maxBytes=5_000_000, backupCount=2, encoding="utf-8")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+logger.addHandler(file_handler)
 
 MODEL_REPO = os.getenv("MODEL_ID", "litert-community/gemma-4-E2B-it-litert-lm")
 MODEL_FILE = os.getenv("MODEL_FILE", "gemma-4-E2B-it.litertlm")
@@ -81,6 +90,9 @@ async def chat_completions(request: ChatCompletionRequest):
     OpenAI uyumlu sohbet tamamlama endpoint'i. 
     Hem senkron hem de streaming (akış) modunda yanıt dönebilir.
     """
+    # Gelen isteği numaralandırılmış harika bir JSON formatında log dosyasına yazdır
+    logger.info(f"=== NEW REQUEST ===\n{json.dumps(request.model_dump(exclude_none=True), ensure_ascii=False, indent=2)}\n===================")
+
     if not manager:
         raise HTTPException(status_code=503, detail="Model not loaded. Check server logs.")
 

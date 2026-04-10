@@ -10,7 +10,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
     huggingface_hub.login(token=HF_TOKEN)
 
-DEFAULT_MODEL = "litert-community/gemma-4-E2B-it-litert-lm"
+DEFAULT_MODEL = "litert-community/gemma-4-E4B-it-litert-lm"
 MODELS_BASE_DIR = Path("models")
 
 def repo_to_folder_name(repo_id: str) -> str:

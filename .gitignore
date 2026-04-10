@@ -61,3 +61,8 @@ models/
 # Runtime files
 *.profraw
 *.profdata
+
+# Log files
+logs/
+log/
+*.log
