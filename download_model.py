@@ -13,18 +13,23 @@ if HF_TOKEN:
 DEFAULT_MODEL = "litert-community/gemma-4-E4B-it-litert-lm"
 MODELS_BASE_DIR = Path("models")
 
+
 def repo_to_folder_name(repo_id: str) -> str:
     return repo_id.replace("/", "--")
 
+
 def check_model_exists(model_dir: Path) -> tuple[bool, list[Path]]:
-    """Hem .litertlm hem de .tflite dosyalarını kontrol eder"""
+    """Sadece .litertlm dosyalarını kontrol eder"""
     litertlm_files = list(model_dir.glob("*.litertlm"))
-    tflite_files = list(model_dir.glob("*.tflite"))
-    all_model_files = litertlm_files + tflite_files
-    return bool(all_model_files), all_model_files
+    return bool(litertlm_files), litertlm_files
+
 
 def print_existing_models():
-    models = [d for d in MODELS_BASE_DIR.iterdir() if d.is_dir()] if MODELS_BASE_DIR.exists() else []
+    models = (
+        [d for d in MODELS_BASE_DIR.iterdir() if d.is_dir()]
+        if MODELS_BASE_DIR.exists()
+        else []
+    )
     if not models:
         print("No models installed yet.")
         return
@@ -32,10 +37,11 @@ def print_existing_models():
     for i, model_dir in enumerate(models, 1):
         has_model, files = check_model_exists(model_dir)
         if has_model:
-            size_gb = sum(f.stat().st_size for f in files) / (1024 ** 3)
+            size_gb = sum(f.stat().st_size for f in files) / (1024**3)
             print(f"[{i}]  {model_dir.name} ({size_gb:.2f} GB)")
         else:
             print(f"[{i}]  {model_dir.name} (No model file found)")
+
 
 def download_model(repo_id: str) -> bool:
     folder_name = repo_to_folder_name(repo_id)
@@ -51,9 +57,9 @@ def download_model(repo_id: str) -> bool:
     print(f"Saving to: {model_dir}")
     try:
         snapshot_download(
-            repo_id=repo_id, 
+            repo_id=repo_id,
             local_dir=str(model_dir),
-            allow_patterns=["*.litertlm", "*.tflite", "*.json"]
+            allow_patterns=["*.litertlm", "*.json"],
         )
     except Exception as e:
         print(f"Error downloading model: {e}")
@@ -61,13 +67,14 @@ def download_model(repo_id: str) -> bool:
 
     has_model, files = check_model_exists(model_dir)
     if not has_model:
-        print(f"Download completed but no .litertlm or .tflite file found in '{model_dir}'.")
+        print(f"Download completed but no .litertlm file found in '{model_dir}'.")
         return False
 
-    size_gb = sum(f.stat().st_size for f in files) / (1024 ** 3)
+    size_gb = sum(f.stat().st_size for f in files) / (1024**3)
     print(f"Model '{repo_id}' downloaded successfully!")
     print(f"Total size: {size_gb:.2f} GB")
     return True
+
 
 def main():
     print("=" * 55)
@@ -92,6 +99,7 @@ def main():
         print(f"Run: python main.py")
     else:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     MODELS_BASE_DIR.mkdir(parents=True, exist_ok=True)
